@@ -155,9 +155,9 @@ def generate_synthetic_canteen_dataset(
         viande, poisson, vegetarien, dessert_populaire = _menu_flags(menu_type)
 
         for c in cantines:
-            # Base inscrits avec légère variabilité (tendance annuelle)
+            # Base inscrits "référence" avec légère variabilité (tendance annuelle)
             trend = 1.0 + 0.03 * np.sin(2 * np.pi * (day_offset / max(1, n_days)))
-            base_inscrits = int(max(40, c.base_inscrits * trend + rng.normal(0, c.base_inscrits * 0.03)))
+            base_ref = float(max(0.0, c.base_inscrits * trend + rng.normal(0, c.base_inscrits * 0.03)))
 
             # Fermeture weekend pour scolaire/entreprise
             open_factor = 0.0 if weekend == 1 else 1.0
@@ -199,23 +199,45 @@ def generate_synthetic_canteen_dataset(
             # Événement spécial
             event_factor = 1.12 if evenement_special == 1 else 1.0
 
-            # Demande latente
-            latent_meals = base_inscrits * open_factor * holiday_factor * weekday_factor
-            latent_meals *= menu_factor * rain_factor * temp_factor * event_factor
+            # Nb inscrits (interprété comme "capacité/jour" ou effectif réellement présent sur site)
+            # => baisse forte en cas de fermeture/vacances/férié.
+            inscrits_factor = open_factor * holiday_factor
+            nb_inscrits = int(np.clip(rng.normal(base_ref * inscrits_factor, max(1.0, base_ref * 0.02)), 0, 5000))
 
-            # Absents prévus
+            # Absents prévus (bornés)
             abs_base = 0.06 + (0.03 if vacances == 1 else 0.0) + (0.02 if pluie == 1 else 0.0)
             abs_base += 0.02 if jour_semaine in {"Lundi", "Vendredi"} else 0.0
             nb_absents_prevus = int(
-                np.clip(rng.normal(abs_base * base_inscrits, base_inscrits * 0.02), 0, base_inscrits)
+                np.clip(rng.normal(abs_base * nb_inscrits, max(1.0, nb_inscrits * 0.02)), 0, nb_inscrits)
             )
 
-            # Repas consommés
-            dessert_factor = 1.01 if dessert_populaire == 1 else 1.0
-            meals_mean = max(0.0, latent_meals * dessert_factor - nb_absents_prevus)
-            nb_repas = int(
-                np.clip(rng.normal(meals_mean, max(5.0, meals_mean * 0.04)), 0, base_inscrits)
-            )
+            # Repas consommés: logique métier explicite
+            # Base: présents théoriques = inscrits - absents (règle simple et crédible)
+            present_theorique = int(max(0, nb_inscrits - nb_absents_prevus))
+
+            # 1) une grande partie des présents mangent effectivement
+            presence_rate = float(rng.uniform(0.90, 1.00))
+            nb_repas = int(present_theorique * presence_rate)
+
+            # 2) ajustements (météo / menu / événement)
+            if pluie == 1:
+                nb_repas = int(nb_repas * 0.97)
+            if menu_type == "pizza":
+                nb_repas = int(nb_repas * 1.05)
+            elif menu_type in {"pates", "fete"}:
+                nb_repas = int(nb_repas * 1.03)
+            elif menu_type == "poisson":
+                nb_repas = int(nb_repas * 0.97)
+            elif menu_type == "eco":
+                nb_repas = int(nb_repas * 0.98)
+            if evenement_special == 1:
+                nb_repas = int(nb_repas * 1.04)
+
+            # 3) bruit léger (incertitude réelle)
+            nb_repas = int(round(nb_repas + rng.normal(0.0, max(1.0, present_theorique * 0.015))))
+
+            # 4) bornes métier
+            nb_repas = int(np.clip(nb_repas, 0, present_theorique))
 
             # Portion moyenne (kg)
             portion_base = 0.52 if c.type_cantine == "scolaire" else 0.56
@@ -228,7 +250,10 @@ def generate_synthetic_canteen_dataset(
             # Planification production (pas basée sur nb_repas réel)
             safety_planning = 0.04 + (0.03 if evenement_special == 1 else 0.0)
             production_uncertainty = rng.normal(0.0, 0.03)
-            planned_meals = max(0.0, latent_meals - (0.8 * nb_absents_prevus))
+            # On planifie sur un niveau attendu "raisonnable" proche de (inscrits - absents),
+            # avec un ajustement jour de semaine / menu / météo / événement.
+            expected_factor = np.clip(weekday_factor * menu_factor * rain_factor * temp_factor * event_factor, 0.75, 1.20)
+            planned_meals = max(0.0, (nb_inscrits - nb_absents_prevus) * expected_factor)
             quantite_produite_kg = float(
                 np.clip(
                     planned_meals * portion_moyenne_kg * (1.0 + safety_planning + production_uncertainty),
@@ -263,8 +288,9 @@ def generate_synthetic_canteen_dataset(
                     "semaine_annee": semaine_annee,
                     "vacances": vacances,
                     "jour_ferie": jour_ferie,
-                    "nb_inscrits": base_inscrits,
+                    "nb_inscrits": nb_inscrits,
                     "nb_absents_prevus": nb_absents_prevus,
+                    "present_theorique": present_theorique,
                     "menu_type": menu_type,
                     "viande": viande,
                     "poisson": poisson,

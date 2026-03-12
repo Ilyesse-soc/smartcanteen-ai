@@ -83,11 +83,17 @@ def predict_from_dataframe(
     leakage_cols = artifact.get("leakage_cols_dropped", [])
 
     if history_df is not None and len(history_df) > 0:
-        df_for_feat = pd.concat([history_df.copy(), input_df.copy()], axis=0, ignore_index=True)
+        hist = history_df.copy()
+        hist["_is_input"] = 0
+        inp = input_df.copy()
+        inp["_is_input"] = 1
+        df_for_feat = pd.concat([hist, inp], axis=0, ignore_index=True)
         df_feat_all = build_feature_frame(df_for_feat, spec)
-        df_feat = df_feat_all.tail(len(input_df)).copy()
+        df_feat = df_feat_all[df_feat_all["_is_input"] == 1].copy()
     else:
         df_feat = build_feature_frame(input_df, spec)
+
+    df_feat = df_feat.drop(columns=["_is_input"], errors="ignore")
 
     df_feat = df_feat.drop(columns=[spec.date_col], errors="ignore")
     df_feat = df_feat.drop(columns=leakage_cols, errors="ignore")
@@ -103,8 +109,18 @@ def predict_from_dataframe(
     nb_inscrits = float(input_df.iloc[0].get("nb_inscrits", 0.0))
     nb_absents_prevus = float(input_df.iloc[0].get("nb_absents_prevus", 0.0))
 
+    # Contrainte métier: on centre autour de (inscrits - absents) et on laisse le modèle ajuster ±10%,
+    # tout en imposant 0 <= repas <= inscrits.
+    repas_model = int(max(0, round(y_pred)))
+    base = float(max(0.0, nb_inscrits - nb_absents_prevus))
+    lower = int(max(0, round(base * 0.90)))
+    upper = int(min(round(nb_inscrits), round(base * 1.10)))
+    if upper < lower:
+        upper = lower
+    repas_predits = int(np.clip(repas_model, lower, upper))
+
     business: BusinessResult = build_business_result(
-        nb_repas_predits=y_pred,
+        nb_repas_predits=float(repas_predits),
         portion_moyenne_kg=portion_moyenne_kg,
         marge_securite=safety_margin,
         stock_disponible_kg=stock_disponible_kg,
