@@ -8,10 +8,16 @@ import pandas as pd
 from joblib import load
 from matplotlib import pyplot as plt
 
+try:
+    from autogluon.tabular import TabularPredictor
+except Exception:  # pragma: no cover
+    TabularPredictor = None  # type: ignore
+
 from src.config import PATHS
 from src.feature_engineering import FeatureSpec, build_feature_frame, split_time_based
 from src.preprocess import split_features_target
 from src.metrics import compute_metrics
+from src.utils import cast_nullable_int_to_float
 
 
 def _plot_real_vs_pred(y_true: np.ndarray, y_pred: np.ndarray, out_path: Path) -> None:
@@ -83,11 +89,21 @@ def evaluate_and_report(df_raw: pd.DataFrame, artifacts_dir: Path | None = None)
 
     test_ml = test_df.drop(columns=[spec.date_col] + leakage_cols, errors="ignore")
     X_test, y_test = split_features_target(test_ml, spec.target_col)
+    test_ag = cast_nullable_int_to_float(test_ml)
 
-    preprocessor = artifact["preprocessor"]
-    model = artifact["model"]
-    X_test_pp = preprocessor.transform(X_test)
-    y_pred = np.clip(model.predict(X_test_pp), 0, None)
+    if artifact.get("model_framework") == "autogluon":
+        if TabularPredictor is None:
+            raise RuntimeError("AutoGluon n'est pas importable pour l'évaluation.")
+        ag_model_path = artifact.get("autogluon_model_path")
+        if not ag_model_path:
+            raise RuntimeError("Chemin du modèle AutoGluon introuvable dans l'artifact.")
+        predictor = TabularPredictor.load(ag_model_path)
+        y_pred = np.clip(predictor.predict(test_ag).to_numpy(dtype=float), 0, None)
+    else:
+        preprocessor = artifact["preprocessor"]
+        model = artifact["model"]
+        X_test_pp = preprocessor.transform(X_test)
+        y_pred = np.clip(model.predict(X_test_pp), 0, None)
 
     metrics = compute_metrics(y_test.values, y_pred)
     report = pd.DataFrame([{"model": artifact.get("model_name", "best_model"), **metrics}])

@@ -80,6 +80,20 @@ Cela va :
 - sauvegarder le meilleur modèle dans `models/trained_model.joblib`
 - sauvegarder quelques figures dans `models/`
 
+### Option AutoML avec AutoGluon
+
+Pour intégrer AutoGluon dans le pipeline (sans casser le flux existant), activez l'option suivante :
+
+```bash
+python main.py --all --use-autogluon --autogluon-time-limit 300 --autogluon-presets medium_quality
+```
+
+- `--use-autogluon` : ajoute AutoGluon comme candidat en plus de baseline / RandomForest / XGBoost
+- `--autogluon-time-limit` : budget temps (en secondes) pour la recherche AutoML
+- `--autogluon-presets` : niveau de qualité/temps AutoGluon
+
+Le meilleur modèle (y compris AutoGluon s'il gagne) est sauvegardé dans `models/trained_model.joblib` et reste utilisable par l'app Streamlit.
+
 ## Lancer l’app Streamlit
 
 Après avoir entraîné le modèle :

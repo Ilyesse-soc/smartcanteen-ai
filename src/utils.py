@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 
 
 def ensure_dir(path: Path) -> None:
@@ -29,3 +30,11 @@ def save_json(path: Path, payload: dict[str, Any]) -> None:
     ensure_dir(path.parent)
     with path.open("w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2, default=to_jsonable)
+
+
+def cast_nullable_int_to_float(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    for col in out.columns:
+        if str(out[col].dtype) == "Int64":
+            out[col] = out[col].astype("float64")
+    return out

@@ -15,10 +15,17 @@ except Exception as e:  # pragma: no cover
     XGBRegressor = None  # type: ignore
     _XGB_IMPORT_ERROR = e
 
+try:
+    from autogluon.tabular import TabularPredictor
+except Exception as e:  # pragma: no cover
+    TabularPredictor = None  # type: ignore
+    _AUTOGLUON_IMPORT_ERROR = e
+
 from src.config import PATHS, RANDOM_SEED
 from src.metrics import compute_metrics
 from src.feature_engineering import FeatureSpec, build_feature_frame, split_time_based
 from src.preprocess import PreprocessSpec, build_preprocessor, split_features_target
+from src.utils import cast_nullable_int_to_float
 
 
 @dataclass(frozen=True)
@@ -47,7 +54,13 @@ def _baseline_rolling7_predict(df_all: pd.DataFrame, spec: FeatureSpec) -> pd.Se
     return pred.loc[df_all.index]
 
 
-def train_and_select_best(df_raw: pd.DataFrame) -> TrainingResult:
+def train_and_select_best(
+    df_raw: pd.DataFrame,
+    *,
+    use_autogluon: bool = False,
+    autogluon_time_limit: int = 120,
+    autogluon_presets: str = "medium_quality",
+) -> TrainingResult:
     spec = FeatureSpec()
     df_feat = build_feature_frame(df_raw, spec)
     df_feat = df_feat.dropna(subset=[spec.date_col])
@@ -111,24 +124,60 @@ def train_and_select_best(df_raw: pd.DataFrame) -> TrainingResult:
     xgb_pred = np.clip(xgb.predict(X_test_pp), 0, None)
     xgb_metrics = compute_metrics(y_test.values, xgb_pred)
 
-    metrics_table = pd.DataFrame(
-        [
-            {"model": "baseline_roll7", **baseline_metrics},
-            {"model": "random_forest", **rf_metrics},
-            {"model": "xgboost", **xgb_metrics},
-        ]
-    ).sort_values("MAE")
+    autogluon_metrics: dict[str, float] | None = None
+    autogluon_model_path: str | None = None
+    if use_autogluon:
+        if TabularPredictor is None:
+            raise RuntimeError(
+                "AutoGluon n'est pas importable. Installez les dépendances via requirements.txt. "
+                f"Détail import: {_AUTOGLUON_IMPORT_ERROR}"
+            )
+        train_ag = cast_nullable_int_to_float(train_ml)
+        test_ag = cast_nullable_int_to_float(test_ml)
+
+        ag_path = PATHS.models_dir / "autogluon"
+        ag_path.mkdir(parents=True, exist_ok=True)
+        ag = TabularPredictor(
+            label=spec.target_col,
+            problem_type="regression",
+            eval_metric="mean_absolute_error",
+            path=str(ag_path),
+        )
+        ag.fit(
+            train_data=train_ag,
+            presets=autogluon_presets,
+            time_limit=autogluon_time_limit,
+            verbosity=0,
+        )
+        ag_pred = np.clip(ag.predict(test_ag).to_numpy(dtype=float), 0, None)
+        autogluon_metrics = compute_metrics(y_test.values, ag_pred)
+        autogluon_model_path = str(ag.path)
+
+    rows = [
+        {"model": "baseline_roll7", **baseline_metrics},
+        {"model": "random_forest", **rf_metrics},
+        {"model": "xgboost", **xgb_metrics},
+    ]
+    if autogluon_metrics is not None:
+        rows.append({"model": "autogluon", **autogluon_metrics})
+
+    metrics_table = pd.DataFrame(rows).sort_values("MAE")
 
     best_ml_name, best_model = ("random_forest", rf)
     best_ml_metrics = rf_metrics
     if xgb_metrics["MAE"] < rf_metrics["MAE"]:
         best_ml_name, best_model = ("xgboost", xgb)
         best_ml_metrics = xgb_metrics
+    if autogluon_metrics is not None and autogluon_metrics["MAE"] < best_ml_metrics["MAE"]:
+        best_ml_name, best_model = ("autogluon", autogluon_model_path)
+        best_ml_metrics = autogluon_metrics
 
     PATHS.models_dir.mkdir(parents=True, exist_ok=True)
     artifact = {
         "model_name": best_ml_name,
         "model": best_model,
+        "model_framework": "autogluon" if best_ml_name == "autogluon" else "sklearn",
+        "autogluon_model_path": autogluon_model_path,
         "preprocessor": preprocessor,
         "preprocess_spec": preprocess_spec,
         "feature_spec": spec,
@@ -137,6 +186,7 @@ def train_and_select_best(df_raw: pd.DataFrame) -> TrainingResult:
             "baseline_roll7": baseline_metrics,
             "random_forest": rf_metrics,
             "xgboost": xgb_metrics,
+            "autogluon": autogluon_metrics,
             "best_ml": best_ml_metrics,
         },
     }

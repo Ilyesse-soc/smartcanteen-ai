@@ -45,6 +45,23 @@ def _parse_args() -> argparse.Namespace:
         default=DEFAULT_SAFETY_MARGIN,
         help="Marge de sécurité métier (ex: 0.05 pour 5%%). Défaut: %(default)s",
     )
+    parser.add_argument(
+        "--use-autogluon",
+        action="store_true",
+        help="Active AutoGluon AutoML comme candidat supplémentaire pendant l'entraînement.",
+    )
+    parser.add_argument(
+        "--autogluon-time-limit",
+        type=int,
+        default=120,
+        help="Temps max (secondes) pour AutoGluon. Défaut: %(default)s",
+    )
+    parser.add_argument(
+        "--autogluon-presets",
+        type=str,
+        default="medium_quality",
+        help="Preset AutoGluon (best_quality, high_quality, good_quality, medium_quality...).",
+    )
 
     return parser.parse_args()
 
@@ -71,7 +88,12 @@ def main() -> None:
                 f"Dataset introuvable ou vide: {PATHS.raw_data_path}. Lancez d'abord --generate-data."
             )
         df = pd.read_csv(PATHS.raw_data_path)
-        training_result = train_and_select_best(df)
+        training_result = train_and_select_best(
+            df,
+            use_autogluon=args.use_autogluon,
+            autogluon_time_limit=args.autogluon_time_limit,
+            autogluon_presets=args.autogluon_presets,
+        )
         print(f"✅ Meilleur modèle: {training_result.best_model_name}")
         print("\n=== Comparatif modèles (test) ===")
         print(training_result.metrics_table.to_string(index=False))

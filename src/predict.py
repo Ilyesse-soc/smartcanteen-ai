@@ -8,9 +8,15 @@ import numpy as np
 import pandas as pd
 from joblib import load
 
+try:
+    from autogluon.tabular import TabularPredictor
+except Exception:  # pragma: no cover
+    TabularPredictor = None  # type: ignore
+
 from src.business import BusinessResult, build_business_result
 from src.config import DEFAULT_SAFETY_MARGIN, PATHS
 from src.feature_engineering import FeatureSpec, build_feature_frame
+from src.utils import cast_nullable_int_to_float
 
 
 @dataclass(frozen=True)
@@ -97,11 +103,21 @@ def predict_from_dataframe(
 
     df_feat = df_feat.drop(columns=[spec.date_col], errors="ignore")
     df_feat = df_feat.drop(columns=leakage_cols, errors="ignore")
+    df_feat = cast_nullable_int_to_float(df_feat)
 
-    preprocessor = artifact["preprocessor"]
-    model = artifact["model"]
-    X_pp = preprocessor.transform(df_feat)
-    y_pred = float(np.clip(model.predict(X_pp)[0], 0, None))
+    if artifact.get("model_framework") == "autogluon":
+        if TabularPredictor is None:
+            raise RuntimeError("AutoGluon n'est pas importable pour l'inférence.")
+        ag_model_path = artifact.get("autogluon_model_path")
+        if not ag_model_path:
+            raise RuntimeError("Chemin du modèle AutoGluon introuvable dans l'artifact.")
+        predictor = TabularPredictor.load(ag_model_path)
+        y_pred = float(np.clip(predictor.predict(df_feat).to_numpy(dtype=float)[0], 0, None))
+    else:
+        preprocessor = artifact["preprocessor"]
+        model = artifact["model"]
+        X_pp = preprocessor.transform(df_feat)
+        y_pred = float(np.clip(model.predict(X_pp)[0], 0, None))
 
     stock_disponible_kg = float(input_df.iloc[0].get("stock_disponible_kg", 0.0))
     quantite_produite_kg = float(input_df.iloc[0].get("quantite_produite_kg", 0.0))
