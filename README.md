@@ -166,6 +166,7 @@ Objectif : séparer strictement entraînement et inférence, tout en garantissan
 2. **Stabiliser l’artefact de modèle**
    - Conserver dans un artefact unique : modèle, préprocesseur, spec de features, colonnes exclues (anti-fuite), métadonnées (version, date, métriques, signature des features).
    - Versionner l’artefact pour garantir compatibilité descendante API.
+   - Définir une politique de compatibilité explicite : incrément majeur si schéma d’entrée/sortie ou logique preprocessing change de manière non rétrocompatible.
 
 3. **Garantir l’identité preprocessing entraînement/inférence**
    - Interdire toute logique de transformation “manuelle” côté API qui diverge du pipeline entraîné.
@@ -174,6 +175,7 @@ Objectif : séparer strictement entraînement et inférence, tout en garantissan
 
 4. **Sécurité ML et robustesse**
    - Contrôler explicitement les colonnes de fuite (features calculées à partir de la cible réelle).
+   - Maintenir une allowlist de features autorisées en inférence et l’intégrer aux métadonnées d’artefact.
    - Ajouter des garde-fous de domaine (bornes plausibles, valeurs négatives interdites, gestion des NaN/inconnus).
 
 Critères de sortie :
@@ -189,7 +191,7 @@ Objectif : normaliser les échanges Front/Back avec un contrat strict, explicite
 
 1. **Schémas d’entrée**
    - Définir un modèle `PredictionRequest` avec types stricts, bornes numériques et enums (ex. jours/menu).
-   - Prévoir des defaults seulement quand ils sont métierement justifiés.
+   - Prévoir des defaults uniquement pour des champs optionnels avec fallback robuste, sans masquer l’absence de données métier critiques.
    - Séparer les champs “utilisateur” des champs techniques (traçabilité, version API, id requête).
 
 2. **Schémas de sortie**
@@ -227,6 +229,8 @@ Objectif : backend modulaire, faible latence, non bloquant, prêt pour industria
 
 3. **Non-blocage event-loop**
    - Si inférence CPU lourde, l’exécuter hors event-loop principal (threadpool/process pool) pour préserver la réactivité FastAPI.
+   - Règle pratique : pour l’inférence CPU-bound, privilégier le process pool (dans un runtime CPython standard avec GIL, le threadpool ne donne pas de vrai parallélisme CPU). Réserver threadpool/`asyncio` aux tâches I/O-bound et valider le choix via tests de charge.
+   - En production, comparer aussi cette approche à un déploiement multi-workers (ex. plusieurs workers Uvicorn/Gunicorn) selon votre profil de charge.
    - Encadrer timeouts et limiter la concurrence pour éviter saturation CPU.
 
 4. **Observabilité et exploitation**
@@ -277,7 +281,8 @@ Critères de sortie :
 
 ### Risques clés à piloter dès le départ
 
-- **Data leakage** : vérifier qu’aucune feature de vérité terrain n’entre en inférence.
+- **Data leakage** : vérifier qu’aucune feature de vérité terrain (ground truth) n’entre en inférence.
+- **Détection fuite** : maintenir une allowlist de features autorisées dans les métadonnées d’artefact, la vérifier à la création d’artefact (entraînement) puis au démarrage API (chargement `ml/`), et la couvrir par test automatique.
 - **Drift de schéma** : détecter les payloads front incompatibles avec le modèle courant.
 - **Blocage CPU** : empêcher qu’une inférence lente dégrade toute l’API.
 - **Incohérence métier** : harmoniser les règles de bornes/priorités entre modèle et UX.
