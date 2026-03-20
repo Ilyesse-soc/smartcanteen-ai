@@ -149,7 +149,8 @@ def train_and_select_best(
             time_limit=autogluon_time_limit,
             verbosity=0,
         )
-        ag_pred = np.clip(ag.predict(test_ag).to_numpy(dtype=float), 0, None)
+        test_ag_features = test_ag.drop(columns=[spec.target_col], errors="ignore")
+        ag_pred = np.clip(ag.predict(test_ag_features).to_numpy(dtype=float), 0, None)
         autogluon_metrics = compute_metrics(y_test.values, ag_pred)
         autogluon_model_path = str(ag.path)
 
