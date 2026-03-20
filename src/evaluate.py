@@ -97,7 +97,9 @@ def evaluate_and_report(df_raw: pd.DataFrame, artifacts_dir: Path | None = None)
         if not ag_model_path:
             raise RuntimeError("Chemin du modèle AutoGluon introuvable dans l'artifact.")
         predictor = TabularPredictor.load(ag_model_path)
-        test_ag = cast_nullable_int_to_float(test_ml)
+        test_ag = cast_nullable_int_to_float(
+            test_ml.drop(columns=[spec.target_col], errors="ignore")
+        )
         y_pred = np.clip(predictor.predict(test_ag).to_numpy(dtype=float), 0, None)
     else:
         preprocessor = artifact["preprocessor"]
