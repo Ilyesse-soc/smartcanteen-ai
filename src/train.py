@@ -169,7 +169,7 @@ def train_and_select_best(
         best_ml_name, best_model = ("xgboost", xgb)
         best_ml_metrics = xgb_metrics
     if autogluon_metrics is not None and autogluon_metrics["MAE"] < best_ml_metrics["MAE"]:
-        best_ml_name, best_model = ("autogluon", autogluon_model_path)
+        best_ml_name, best_model = ("autogluon", None)
         best_ml_metrics = autogluon_metrics
 
     PATHS.models_dir.mkdir(parents=True, exist_ok=True)
@@ -186,10 +186,11 @@ def train_and_select_best(
             "baseline_roll7": baseline_metrics,
             "random_forest": rf_metrics,
             "xgboost": xgb_metrics,
-            "autogluon": autogluon_metrics,
             "best_ml": best_ml_metrics,
         },
     }
+    if autogluon_metrics is not None:
+        artifact["metrics"]["autogluon"] = autogluon_metrics
     dump(artifact, PATHS.model_path)
 
     return TrainingResult(

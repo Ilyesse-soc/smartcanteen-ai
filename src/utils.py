@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_integer_dtype
 
 
 def ensure_dir(path: Path) -> None:
@@ -34,7 +35,9 @@ def save_json(path: Path, payload: dict[str, Any]) -> None:
 
 def cast_nullable_int_to_float(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
-    for col in out.columns:
-        if str(out[col].dtype) == "Int64":
-            out[col] = out[col].astype("float64")
+    nullable_int_cols = [
+        c for c, dt in out.dtypes.items() if is_integer_dtype(dt) and hasattr(dt, "na_value")
+    ]
+    if nullable_int_cols:
+        out[nullable_int_cols] = out[nullable_int_cols].astype("float64")
     return out
