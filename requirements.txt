@@ -5,3 +5,4 @@ xgboost>=2.0.0
 matplotlib>=3.8.0
 joblib>=1.3.0
 streamlit>=1.33.0
+autogluon.tabular>=1.1.1
