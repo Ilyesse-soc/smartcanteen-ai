@@ -3,7 +3,8 @@
 ## Prerequis
 
 - Python 3.11+
-- Docker et Docker Compose (optionnel, pour execution conteneurisee)
+- Docker et Docker Compose (optionnel,
+  pour execution conteneurisee)
 
 ## Installation locale
 
@@ -39,7 +40,10 @@ Ce run:
 ### Option AutoGluon
 
 ```bash
-python main.py --all --use-autogluon --autogluon-time-limit 300 --autogluon-presets medium_quality
+python main.py --all \
+	--use-autogluon \
+	--autogluon-time-limit 300 \
+	--autogluon-presets medium_quality
 ```
 
 ## Lancer Streamlit
@@ -48,7 +52,8 @@ python main.py --all --use-autogluon --autogluon-time-limit 300 --autogluon-pres
 streamlit run app/streamlit_app.py
 ```
 
-Si models/trained_model.joblib est absent, il faut executer python main.py --all.
+Si models/trained_model.joblib est absent,
+il faut executer python main.py --all.
 
 ## Lancer FastAPI
 
@@ -70,4 +75,4 @@ curl http://localhost:8000/health
 docker-compose up --build
 ```
 
-API disponible sur http://localhost:8000.
+API disponible sur [http://localhost:8000](http://localhost:8000).

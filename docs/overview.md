@@ -1,6 +1,7 @@
 # SmartCanteen-AI: Vue d'ensemble
 
-Ce projet vise a predire la frequentation d'une cantine, recommander la quantite de production et estimer le gaspillage alimentaire.
+Ce projet vise a predire la frequentation d'une cantine,
+recommander la quantite de production et estimer le gaspillage alimentaire.
 
 ## Objectif metier
 
