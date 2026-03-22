@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.models.prediction import Prediction
@@ -11,6 +12,10 @@ class PredictionRepository:
 
     def create(self, prediction: Prediction) -> Prediction:
         self._session.add(prediction)
-        self._session.commit()
+        try:
+            self._session.commit()
+        except SQLAlchemyError:
+            self._session.rollback()
+            raise
         self._session.refresh(prediction)
         return prediction

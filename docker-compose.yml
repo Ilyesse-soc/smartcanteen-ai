@@ -22,7 +22,7 @@ services:
       dockerfile: Dockerfile
     container_name: smartcanteen-api
     env_file:
-      - .env.example
+      - .env
     ports:
       - "8000:8000"
     depends_on:

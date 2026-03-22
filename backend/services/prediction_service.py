@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from src.business import build_business_result
+from src.config import DEFAULT_SAFETY_MARGIN
 
 from backend.models.prediction import Prediction
 from backend.repositories.prediction_repository import PredictionRepository
@@ -12,11 +13,11 @@ class PredictionService:
         self._repository = repository
 
     def create_prediction(self, request: PredictionRequest) -> PredictionResponse:
-        repas_prevus = max(0, request.nb_inscrits - request.nb_absents_prevus)
+        nb_repas_attendus = max(0, request.nb_inscrits - request.nb_absents_prevus)
         business_result = build_business_result(
-            nb_repas_predits=float(repas_prevus),
+            nb_repas_predits=float(nb_repas_attendus),
             portion_moyenne_kg=request.portion_moyenne_kg,
-            marge_securite=0.05,
+            marge_securite=DEFAULT_SAFETY_MARGIN,
             stock_disponible_kg=request.stock_disponible_kg,
             quantite_produite_kg=request.quantite_produite_kg,
             nb_inscrits=float(request.nb_inscrits),
