@@ -1,0 +1,64 @@
+name: Documentation
+
+on:
+  push:
+    paths:
+      - README.md
+      - docs/**
+      - .github/workflows/docs.yml
+  pull_request:
+    paths:
+      - README.md
+      - docs/**
+      - .github/workflows/docs.yml
+
+jobs:
+  markdown-lint:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint markdown files
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        with:
+          globs: |
+            README.md
+            docs/**/*.md
+
+  docs-structure:
+    name: Docs Structure Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required docs files and README links
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required_files=(
+            "docs/overview.md"
+            "docs/setup-and-run.md"
+            "docs/ml-pipeline.md"
+            "docs/backend-api.md"
+            "docs/architecture-roadmap.md"
+          )
+
+          for file in "${required_files[@]}"; do
+            if [[ ! -f "$file" ]]; then
+              echo "Missing required doc file: $file"
+              exit 1
+            fi
+          done
+
+          for file in "${required_files[@]}"; do
+            if ! grep -q "$file" README.md; then
+              echo "README.md must reference: $file"
+              exit 1
+            fi
+          done
+
+          echo "Documentation structure is valid."
