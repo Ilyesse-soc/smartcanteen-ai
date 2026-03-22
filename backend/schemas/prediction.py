@@ -20,7 +20,16 @@ class PredictionRequest(BaseModel):
     mois: int = Field(ge=1, le=12)
     nb_inscrits: int = Field(ge=0)
     nb_absents_prevus: int = Field(ge=0)
-    menu_type: Literal["standard", "poisson", "vegetarien", "pizza", "pates", "fete"]
+    menu_type: Literal[
+        "standard",
+        "poisson",
+        "vegetarien",
+        "pizza",
+        "pates",
+        "fete",
+        "eco",
+        "gourmet",
+    ]
     stock_disponible_kg: float = Field(ge=0)
     quantite_produite_kg: float = Field(ge=0)
     portion_moyenne_kg: float = Field(gt=0)
