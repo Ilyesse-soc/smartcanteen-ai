@@ -47,7 +47,7 @@ Reponse JSON:
 ## Exemple de requete
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/predictions \
+curl -X POST localhost:8000/api/v1/predictions \
   -H "Content-Type: application/json" \
   -d '{
     "jour_semaine": "Mardi",

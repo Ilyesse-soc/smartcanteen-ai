@@ -41,9 +41,9 @@ Ce run:
 
 ```bash
 python main.py --all \
-	--use-autogluon \
-	--autogluon-time-limit 300 \
-	--autogluon-presets medium_quality
+  --use-autogluon \
+  --autogluon-time-limit 300 \
+  --autogluon-presets medium_quality
 ```
 
 ## Lancer Streamlit
@@ -66,7 +66,7 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 Healthcheck:
 
 ```bash
-curl http://localhost:8000/health
+curl localhost:8000/health
 ```
 
 ### Docker Compose

@@ -11,12 +11,12 @@ recommander la quantite de production et estimer le gaspillage alimentaire.
 
 - Vue d'ensemble produit et perimetre: [docs/overview.md](docs/overview.md)
 - Installation et execution locale/Docker:
-	[docs/setup-and-run.md](docs/setup-and-run.md)
+  [docs/setup-and-run.md](docs/setup-and-run.md)
 - Pipeline data science et ML: [docs/ml-pipeline.md](docs/ml-pipeline.md)
 - API FastAPI (contrats, endpoint, erreurs):
-	[docs/backend-api.md](docs/backend-api.md)
+  [docs/backend-api.md](docs/backend-api.md)
 - Architecture cible et roadmap:
-	[docs/architecture-roadmap.md](docs/architecture-roadmap.md)
+  [docs/architecture-roadmap.md](docs/architecture-roadmap.md)
 
 ## Demarrage rapide
 
