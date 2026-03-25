@@ -43,8 +43,17 @@ def train_model_task(file_path: str, target_column: str) -> dict:
     computed_time_limit = 30 + (rows * cols * 0.001)
     time_limit = int(max(60, min(1800, computed_time_limit)))
 
-    job_dir = MODELS_BASE_DIR / f"job_{uuid4().hex}"
-    job_dir.mkdir(parents=True, exist_ok=False)
+    job_dir = None
+    for _ in range(3):
+        candidate = MODELS_BASE_DIR / f"job_{uuid4().hex}"
+        try:
+            candidate.mkdir(parents=True, exist_ok=False)
+            job_dir = candidate
+            break
+        except FileExistsError:
+            continue
+    if job_dir is None:
+        raise RuntimeError("Impossible de créer un dossier de job unique.")
 
     predictor = TabularPredictor(label=target_column, path=str(job_dir)).fit(
         train_data=df,
