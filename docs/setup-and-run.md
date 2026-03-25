@@ -76,3 +76,41 @@ docker-compose up --build
 ```
 
 API disponible sur [http://localhost:8000](http://localhost:8000).
+
+## Exemple d'intégration backend -> worker Celery (Redis)
+
+Le worker expose la tâche `train_model_task(file_path, target_column)` via Redis.
+
+Exemple pseudocode backend Python:
+
+```python
+from celery import Celery
+
+celery_app = Celery(
+    "backend",
+    broker="redis://redis:6379/0",
+    backend="redis://redis:6379/1",
+)
+
+job = celery_app.send_task(
+    "train_model_task",
+    kwargs={
+        "file_path": "/shared_data/datasets/mon_fichier.csv",
+        "target_column": "target",
+    },
+)
+
+print(job.id)           # id du job asynchrone
+print(job.get())        # résultat: leaderboard (records) + métadonnées
+```
+
+Exemple curl générique (si votre backend expose un endpoint de dispatch):
+
+```bash
+curl -X POST http://localhost:8000/jobs/train \
+  -H "Content-Type: application/json" \
+  -d '{
+    "file_path": "/shared_data/datasets/mon_fichier.csv",
+    "target_column": "target"
+  }'
+```
