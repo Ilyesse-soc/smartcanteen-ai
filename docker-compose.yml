@@ -1,34 +1,47 @@
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: smartcanteen-db
+  backend:
+    image: python:3.11-slim
+    container_name: smartcanteen-backend-mock
+    working_dir: /app
+    command: sh -c "python -m http.server 8000"
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-smartcanteen}
-      POSTGRES_USER: ${POSTGRES_USER:-smartcanteen}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartcanteen}
-    ports:
-      - "5432:5432"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smartcanteen} -d ${POSTGRES_DB:-smartcanteen}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: smartcanteen-api
-    env_file:
-      - .env
+      - shared_data:/shared_data
     ports:
       - "8000:8000"
     depends_on:
-      db:
+      redis:
         condition: service_healthy
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+
+  redis:
+    image: redis:7-alpine
+    container_name: smartcanteen-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  worker:
+    image: python:3.11-slim
+    container_name: smartcanteen-worker
+    working_dir: /worker
+    command: sh -c "pip install --no-cache-dir -r requirements.txt && celery -A worker worker --loglevel=info"
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      SHARED_DATA_DIR: /shared_data
+      WORKER_MODELS_DIR: /shared_data/models
+    volumes:
+      - ./worker:/worker
+      - shared_data:/shared_data
+    depends_on:
+      redis:
+        condition: service_healthy
 
 volumes:
-  postgres_data:
+  shared_data:
